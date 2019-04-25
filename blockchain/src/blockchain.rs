@@ -148,7 +148,7 @@ impl Blockchain {
         Self::with_db(cfg, database, genesis, timestamp)
     }
 
-    fn with_db(
+    pub fn with_db(
         cfg: BlockchainConfig,
         database: ListDb,
         genesis: Vec<Block>,
