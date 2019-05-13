@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn not_connected_expire() {
-        let mut addrs = Addresses::with_time_to_live(Duration::from_secs(4));
+        let mut addrs = Addresses::with_time_to_live(Duration::from_secs(6));
 
         addrs.insert_not_connected("/ip4/1.2.3.4/tcp/5".parse().unwrap());
         assert_eq!(addrs.iter().count(), 1);
@@ -190,10 +190,10 @@ mod tests {
         addrs.insert_not_connected("/ip4/10.11.12.13/tcp/5".parse().unwrap());
         assert_eq!(addrs.iter().count(), 3);
 
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(4));
         assert_eq!(addrs.iter().count(), 2);
 
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(4));
         assert_eq!(addrs.iter().count(), 0);
     }
 

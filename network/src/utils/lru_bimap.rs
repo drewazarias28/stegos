@@ -197,16 +197,16 @@ mod tests {
     #[test]
     fn check_time_bound() {
         let mut my_map =
-            LruBimap::<u64, u64>::with_expiry_duration_and_capacity(Duration::from_secs(4), 3);
+            LruBimap::<u64, u64>::with_expiry_duration_and_capacity(Duration::from_secs(6), 3);
         my_map.insert(1, 101);
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(3));
         my_map.insert(2, 202);
         my_map.insert(3, 303);
         assert_eq!(my_map.len(), 3);
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(4));
         assert!(my_map.get_by_key(&1).is_none());
         assert_eq!(my_map.len(), 2);
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(4));
         assert!(my_map.get_by_value(&202).is_none());
     }
 }
