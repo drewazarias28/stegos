@@ -843,34 +843,3 @@ pub mod tests {
         assert!(!validate_range_proof(&dum));
     }
 }
-
-// ------------------------------------------------------------
-pub fn bulletproofs_tests() {
-    let (proof, gamma) = make_range_proof(-1); // to pre-compute constants
-    debug!("Start BulletProofs");
-    let start = SystemTime::now();
-    if false {
-        for _ in 1..1000 {
-            make_range_proof(1234567890);
-        }
-    }
-    let (proof, gamma) = make_range_proof(1234567890);
-    let timing = start.elapsed();
-    debug!("proof = {:#?}", proof);
-    debug!("gamma = {:?}", gamma);
-    debug!("Time: {:?}", timing);
-    debug!("");
-    debug!("Start Validation");
-    let start = SystemTime::now();
-    let ans = validate_range_proof(&proof);
-    if false {
-        for _ in 1..1000 {
-            validate_range_proof(&proof);
-        }
-    }
-    let timing = start.elapsed();
-    debug!("Check = {}", ans);
-    debug!("Time: {:?}", timing);
-}
-
-// -------------------------------------------------------------

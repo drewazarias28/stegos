@@ -1,7 +1,7 @@
-//! Test Fast Implementation of Bulletproofs on Curve1174
+//! Bulletproofs Benchmark.
 
 //
-// Copyright (c) 2018 Stegos AG
+// Copyright (c) 2019 Stegos AG
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,9 +21,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use stegos_crypto::bulletproofs::*;
+use criterion::*;
+use stegos_crypto::bulletproofs::{make_range_proof, validate_range_proof};
 
-// -------------------------------------------------------------------------------
-fn main() {
-    bulletproofs_tests();
+fn bulletproofs_benchmark(c: &mut Criterion) {
+    c.bench_function("make_range_proof", |b| {
+        b.iter(|| {
+            make_range_proof(black_box(1234567890));
+        })
+    });
+
+    c.bench_function("validate_range_proof", |b| {
+        let (proof, _gamma) = make_range_proof(1234567890);
+        b.iter(|| {
+            validate_range_proof(black_box(&proof));
+        })
+    });
 }
+
+criterion_group!(benches, bulletproofs_benchmark);
+criterion_main!(benches);

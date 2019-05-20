@@ -1533,4 +1533,20 @@ pub mod tests {
     fn burn_money() {
         create_burn_money(200, 100);
     }
+
+    mod bench {
+        use super::*;
+        use test::Bencher;
+
+        #[bench]
+        fn validate_payment_transaction1(bench: &mut Bencher) {
+            let (skey, pkey) = curve1174::make_random_keys();
+            let (tx, _inputs, _outputs) =
+                PaymentTransaction::new_test(&skey, &pkey, 150, 1, 100, 1, 50)
+                    .expect("Invalid keys");
+            bench.iter(|| {
+                tx.validate(&inputs).expect("Invalid transaction");
+            });
+        }
+    }
 }
