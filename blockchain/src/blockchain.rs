@@ -24,26 +24,23 @@
 use crate::block::*;
 use crate::config::*;
 use crate::election::ElectionInfo;
-use crate::election::{self, mix, ElectionResult};
+use crate::election::{self, ElectionResult};
 use crate::error::*;
 use crate::escrow::*;
 use crate::merkle::*;
 use crate::metrics;
-use crate::multisignature::create_multi_signature;
 use crate::mvcc::MultiVersionedMap;
 use crate::output::*;
 use crate::storage::ListDb;
-use crate::transaction::{CoinbaseTransaction, PaymentTransaction, Transaction};
+use crate::transaction::Transaction;
 use crate::view_changes::ViewChangeProof;
 use failure::Error;
 use log::*;
-use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use stegos_crypto::bulletproofs::fee_a;
 use stegos_crypto::curve1174::{ECp, Fr, PublicKey, SecretKey, G};
 use stegos_crypto::hash::*;
 use stegos_crypto::pbc;
-use stegos_keychain::KeyChain;
 
 pub type ViewCounter = u32;
 pub type ValidatorId = u32;
@@ -1077,162 +1074,18 @@ impl Blockchain {
     }
 }
 
-pub fn sign_fake_macro_block(block: &mut MacroBlock, chain: &Blockchain, keychains: &[KeyChain]) {
-    let block_hash = Hash::digest(block);
-    let validators = chain.validators();
-    let mut signatures: BTreeMap<pbc::PublicKey, pbc::Signature> = BTreeMap::new();
-    for keychain in keychains {
-        let sig = pbc::sign_hash(&block_hash, &keychain.network_skey);
-        signatures.insert(keychain.network_pkey.clone(), sig);
-    }
-    let (multisig, multisigmap) = create_multi_signature(&validators, &signatures);
-    block.body.multisig = multisig;
-    block.body.multisigmap = multisigmap;
-}
-
-pub fn create_fake_macro_block(
-    chain: &Blockchain,
-    keychains: &[KeyChain],
-    timestamp: SystemTime,
-) -> MacroBlock {
-    let version = VERSION;
-    let previous = chain.last_block_hash().clone();
-    let height = chain.height();
-    let view_change = chain.view_change();
-    let key = chain.select_leader(view_change);
-    let keys = keychains.iter().find(|p| p.network_pkey == key).unwrap();
-    let seed = mix(chain.last_random(), view_change);
-    let random = pbc::make_VRF(&keys.network_skey, &seed);
-    let base = BaseBlockHeader::new(version, previous, height, view_change, timestamp, random);
-    let mut block = MacroBlock::empty(base, keys.network_pkey);
-    sign_fake_macro_block(&mut block, chain, keychains);
-    block
-}
-
-pub fn create_fake_micro_block(
-    chain: &Blockchain,
-    keychains: &[KeyChain],
-    timestamp: SystemTime,
-    block_reward: i64,
-) -> (MicroBlock, Vec<Hash>, Vec<Hash>) {
-    let version: u64 = VERSION;
-    let height = chain.height();
-    let view_change = chain.view_change();
-    let key = chain.select_leader(view_change);
-    let keys = keychains.iter().find(|p| p.network_pkey == key).unwrap();
-    let previous = chain.last_block_hash().clone();
-    let seed = mix(chain.last_random(), view_change);
-    let random = pbc::make_VRF(&keys.network_skey, &seed);
-
-    let mut input_hashes: Vec<Hash> = Vec::new();
-    let mut inputs: Vec<Output> = Vec::new();
-    let mut monetary_balance: i64 = 0;
-    let mut staking_balance: i64 = 0;
-    for input_hash in chain.unspent() {
-        let input = chain
-            .output_by_hash(&input_hash)
-            .expect("no disk errors")
-            .expect("exists");
-        input.validate().expect("Valid input");
-        match input {
-            Output::PaymentOutput(ref o) => {
-                let payload = o.decrypt_payload(&keys.wallet_skey).unwrap();
-                monetary_balance += payload.amount;
-            }
-            Output::PublicPaymentOutput(ref o) => {
-                monetary_balance += o.amount;
-            }
-            Output::StakeOutput(ref o) => {
-                staking_balance += o.amount;
-            }
-        }
-        input_hashes.push(input_hash.clone());
-        inputs.push(input);
-    }
-
-    let mut outputs: Vec<Output> = Vec::new();
-    let mut outputs_gamma = Fr::zero();
-    // Payments.
-    if monetary_balance > 0 {
-        let (output, output_gamma) =
-            PaymentOutput::new(&keys.wallet_pkey, monetary_balance).expect("keys are valid");
-        outputs.push(Output::PaymentOutput(output));
-        outputs_gamma += output_gamma;
-    }
-
-    // Stakes.
-    if staking_balance > 0 {
-        let output = StakeOutput::new(
-            &keys.wallet_pkey,
-            &keys.network_skey,
-            &keys.network_pkey,
-            staking_balance,
-        )
-        .expect("keys are valid");
-        outputs.push(Output::StakeOutput(output));
-    }
-
-    let output_hashes: Vec<Hash> = outputs.iter().map(Hash::digest).collect();
-    let block_fee: i64 = 0;
-    let tx = PaymentTransaction::new(
-        &keys.wallet_skey,
-        &inputs,
-        &outputs,
-        &outputs_gamma,
-        block_fee,
-    )
-    .expect("Invalid keys");
-    tx.validate(&inputs).expect("Invalid transaction");
-
-    let coinbase_tx = {
-        let data = PaymentPayloadData::Comment(format!("Block reward"));
-        let (output, gamma) = PaymentOutput::with_payload(&keys.wallet_pkey, block_reward, data)
-            .expect("invalid keys");
-        CoinbaseTransaction {
-            block_reward,
-            block_fee,
-            gamma: -gamma,
-            txouts: vec![Output::PaymentOutput(output)],
-        }
-    };
-    coinbase_tx.validate().expect("Invalid transaction");
-
-    let transactions: Vec<Transaction> = vec![coinbase_tx.into(), tx.into()];
-
-    let base = BaseBlockHeader::new(version, previous, height, view_change, timestamp, random);
-    let mut block = MicroBlock::new(base, None, transactions, keys.network_pkey);
-    block.sign(&keys.network_skey, &keys.network_pkey);
-    (block, input_hashes, output_hashes)
-}
-
-pub fn create_empty_micro_block(
-    chain: &Blockchain,
-    keychains: &[KeyChain],
-    timestamp: SystemTime,
-) -> MicroBlock {
-    let version = VERSION;
-    let previous = chain.last_block_hash().clone();
-    let height = chain.height();
-    let view_change = chain.view_change();
-    let key = chain.select_leader(view_change);
-    let keys = keychains.iter().find(|p| p.network_pkey == key).unwrap();
-    let seed = mix(chain.last_random(), view_change);
-    let random = pbc::make_VRF(&keys.network_skey, &seed);
-    let base = BaseBlockHeader::new(version, previous, height, view_change, timestamp, random);
-    let mut block = MicroBlock::empty(base, None, keys.network_pkey);
-    block.sign(&keys.network_skey, &keys.network_pkey);
-    block
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
 
     use crate::genesis::genesis;
+    use crate::test;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use simple_logger;
+    use std::collections::BTreeMap;
     use std::time::{Duration, SystemTime};
+    use stegos_keychain::KeyChain;
     use tempdir::TempDir;
 
     #[test]
@@ -1338,7 +1191,7 @@ pub mod tests {
             timestamp += Duration::from_millis(1);
             let block_reward = if epoch % 2 == 0 { 60i64 } else { 0i64 };
             let (block, input_hashes, output_hashes) =
-                create_fake_micro_block(&mut chain, &keychains, timestamp, block_reward);
+                test::create_fake_micro_block(&mut chain, &keychains, timestamp, block_reward);
             let hash = Hash::digest(&block);
             let height = chain.height();
             chain
@@ -1357,7 +1210,7 @@ pub mod tests {
             // Empty block.
             //
             timestamp += Duration::from_millis(1);
-            let block = create_empty_micro_block(&mut chain, &keychains, timestamp);
+            let block = test::create_empty_micro_block(&mut chain, &keychains, timestamp);
             let hash = Hash::digest(&block);
             let height = chain.height();
             chain
@@ -1370,7 +1223,7 @@ pub mod tests {
             // Key block.
             //
             timestamp += Duration::from_millis(1);
-            let block = create_fake_macro_block(&chain, &keychains, timestamp);
+            let block = test::create_fake_macro_block(&chain, &keychains, timestamp);
             let hash = Hash::digest(&block);
             let height = chain.height();
             chain
@@ -1424,7 +1277,7 @@ pub mod tests {
         // Register a micro block.
         timestamp += Duration::from_millis(1);
         let (block1, input_hashes1, output_hashes1) =
-            create_fake_micro_block(&mut chain, &keychains, timestamp, 60);
+            test::create_fake_micro_block(&mut chain, &keychains, timestamp, 60);
         chain
             .push_micro_block(block1, timestamp)
             .expect("block is valid");
@@ -1447,7 +1300,7 @@ pub mod tests {
         // Register one more micro block.
         timestamp += Duration::from_millis(1);
         let (block2, input_hashes2, output_hashes2) =
-            create_fake_micro_block(&mut chain, &keychains, timestamp, 0);
+            test::create_fake_micro_block(&mut chain, &keychains, timestamp, 0);
         chain
             .push_micro_block(block2, timestamp)
             .expect("block is valid");
@@ -1523,7 +1376,7 @@ pub mod tests {
         assert!(blockchain.height() > 0);
         for _height in 2..12 {
             timestamp += Duration::from_millis(1);
-            let block = create_empty_micro_block(&blockchain, &keychains, timestamp);
+            let block = test::create_empty_micro_block(&blockchain, &keychains, timestamp);
             blockchain
                 .push_micro_block(block, timestamp)
                 .expect("Invalid block");

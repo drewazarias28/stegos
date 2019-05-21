@@ -35,6 +35,8 @@ pub mod mvcc;
 mod output;
 pub mod protos;
 mod storage;
+#[cfg(test)]
+mod test;
 mod transaction;
 mod validation;
 pub mod view_changes;
