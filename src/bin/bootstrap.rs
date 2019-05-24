@@ -26,7 +26,7 @@ use simple_logger;
 use std::fs;
 use std::process;
 use std::time::SystemTime;
-use stegos_blockchain::{genesis, BlockchainConfig};
+use stegos_blockchain::{genesis, BlockchainConfig, StakeDef};
 use stegos_keychain::KeyChain;
 use stegos_keychain::KeyChainConfig;
 use stegos_serialization::traits::ProtoConvert;
@@ -148,7 +148,17 @@ fn main() {
 
     info!("Generating genesis blocks...");
     let timestamp = SystemTime::now();
-    let blocks = genesis(&keychains, stake, coins, timestamp);
+    let mut stakes = Vec::with_capacity(keychains.len());
+    for i in 0..keychains.len() {
+        let stake_def = StakeDef {
+            recipient_pkey: &keychains[i].wallet_pkey,
+            network_skey: &keychains[i].network_skey,
+            network_pkey: &keychains[i].network_pkey,
+            amount: stake,
+        };
+        stakes.push(stake_def);
+    }
+    let blocks = genesis(&stakes, coins, timestamp);
     for (i, block) in blocks.iter().enumerate() {
         let block_data = block.into_proto();
         let block_data = block_data.write_to_bytes().unwrap();

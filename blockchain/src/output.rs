@@ -134,6 +134,24 @@ pub enum Output {
     StakeOutput(StakeOutput),
 }
 
+impl From<PaymentOutput> for Output {
+    fn from(o: PaymentOutput) -> Self {
+        Output::PaymentOutput(o)
+    }
+}
+
+impl From<PublicPaymentOutput> for Output {
+    fn from(o: PublicPaymentOutput) -> Output {
+        Output::PublicPaymentOutput(o)
+    }
+}
+
+impl From<StakeOutput> for Output {
+    fn from(o: StakeOutput) -> Self {
+        Output::StakeOutput(o)
+    }
+}
+
 /// Cloak recipient's public key.
 fn cloak_key(recipient_pkey: &PublicKey, gamma: &Fr) -> Result<(PublicKey, Fr), Error> {
     // h is the digest of the recipients actual public key mixed with a timestamp.
@@ -464,7 +482,24 @@ impl PublicPaymentOutput {
     }
 }
 
+pub struct StakeDef<'a> {
+    pub recipient_pkey: &'a PublicKey,
+    pub network_skey: &'a pbc::SecretKey,
+    pub network_pkey: &'a pbc::PublicKey,
+    pub amount: i64,
+}
+
 impl StakeOutput {
+    /// Create a new StakeOutput.
+    pub fn from_def(def: &StakeDef) -> Result<Self, Error> {
+        Self::new(
+            def.recipient_pkey,
+            def.network_skey,
+            def.network_pkey,
+            def.amount,
+        )
+    }
+
     /// Create a new StakeOutput.
     pub fn new(
         recipient_pkey: &PublicKey,

@@ -52,9 +52,9 @@ use std::time::SystemTime;
 use stegos_blockchain::*;
 use stegos_consensus::optimistic::{SealedViewChangeProof, ViewChangeCollector, ViewChangeMessage};
 use stegos_consensus::{self as consensus, BlockConsensus, BlockConsensusMessage};
+use stegos_crypto::curve1174;
 use stegos_crypto::hash::Hash;
 use stegos_crypto::pbc;
-use stegos_keychain::KeyChain;
 use stegos_network::Network;
 use stegos_network::UnicastMessage;
 use stegos_serialization::traits::ProtoConvert;
@@ -244,8 +244,12 @@ pub struct NodeService {
     cfg: ChainConfig,
     /// Blockchain.
     chain: Blockchain,
-    /// Key Chain.
-    keys: KeyChain,
+    /// Fee and reward recipient,
+    recipient_pkey: curve1174::PublicKey,
+    /// Network secret key.
+    network_pkey: pbc::PublicKey,
+    /// Network secret key.
+    network_skey: pbc::SecretKey,
 
     /// A time when loader was started the last time
     last_sync_clock: Instant,
@@ -282,7 +286,9 @@ impl NodeService {
     pub fn new(
         cfg: ChainConfig,
         chain: Blockchain,
-        keys: KeyChain,
+        recipient_pkey: curve1174::PublicKey,
+        network_skey: pbc::SecretKey,
+        network_pkey: pbc::PublicKey,
         network: Network,
     ) -> Result<(Self, Node), Error> {
         let (outbox, inbox) = unbounded();
@@ -347,7 +353,9 @@ impl NodeService {
             last_sync_clock,
             future_blocks,
             chain,
-            keys,
+            recipient_pkey,
+            network_skey,
+            network_pkey,
             mempool,
             validation,
             last_block_clock,
@@ -1072,7 +1080,7 @@ impl NodeService {
         };
 
         let leader = self.chain.leader();
-        if leader == self.keys.network_pkey {
+        if leader == self.network_pkey {
             info!(
                 "I'm leader, collecting transactions for the next micro block: height={}, view_change={}, last_block={}",
                 self.chain.height(),
@@ -1151,7 +1159,7 @@ impl NodeService {
         if self.chain.blocks_in_epoch() < self.cfg.blocks_in_epoch {
             // Expected Micro Block.
             let _prev = std::mem::replace(&mut self.validation, MicroBlockAuditor);
-            if !self.chain.is_validator(&self.keys.network_pkey) {
+            if !self.chain.is_validator(&self.network_pkey) {
                 info!("I'm auditor, waiting for the next micro block: height={}, view_change={}, last_block={}",
                       self.chain.height(),
                       self.chain.view_change(),
@@ -1162,11 +1170,8 @@ impl NodeService {
                 return;
             }
 
-            let view_change_collector = ViewChangeCollector::new(
-                &self.chain,
-                self.keys.network_pkey,
-                self.keys.network_skey.clone(),
-            );
+            let view_change_collector =
+                ViewChangeCollector::new(&self.chain, self.network_pkey, self.network_skey.clone());
 
             self.validation = MicroBlockValidator {
                 view_change_collector,
@@ -1177,7 +1182,7 @@ impl NodeService {
         } else {
             // Expected Macro Block.
             let prev = std::mem::replace(&mut self.validation, MacroBlockAuditor);
-            if !self.chain.is_validator(&self.keys.network_pkey) {
+            if !self.chain.is_validator(&self.network_pkey) {
                 info!(
                     "I'm auditor, waiting for the next macro block: height={}, last_block={}",
                     self.chain.height(),
@@ -1191,8 +1196,8 @@ impl NodeService {
             let consensus = BlockConsensus::new(
                 self.chain.height() as u64,
                 self.chain.epoch() + 1,
-                self.keys.network_skey.clone(),
-                self.keys.network_pkey.clone(),
+                self.network_skey.clone(),
+                self.network_pkey.clone(),
                 self.chain.election_result(),
                 self.chain.validators().iter().cloned().collect(),
             );
@@ -1305,8 +1310,8 @@ impl NodeService {
         assert!(consensus.is_leader());
         assert_eq!(self.chain.blocks_in_epoch(), self.cfg.blocks_in_epoch);
         let chain = &self.chain;
-        let network_pkey = &self.keys.network_pkey;
-        let network_skey = &self.keys.network_skey;
+        let network_pkey = &self.network_pkey;
+        let network_skey = &self.network_skey;
         let view_change = consensus.round();
         let create_macro_block = || {
             let block = Self::create_macro_block(chain, view_change, network_skey, network_pkey);
@@ -1475,7 +1480,7 @@ impl NodeService {
             MicroBlockValidator { .. } => {}
             _ => panic!("Expected MicroBlockValidator State"),
         };
-        assert!(self.chain.leader() == self.keys.network_pkey);
+        assert!(self.chain.leader() == self.network_pkey);
         assert!(self.chain.blocks_in_epoch() < self.cfg.blocks_in_epoch);
 
         let height = self.chain.height();
@@ -1492,7 +1497,9 @@ impl NodeService {
             VERSION,
             self.chain.height(),
             self.cfg.block_reward,
-            &self.keys,
+            &self.recipient_pkey,
+            &self.network_skey,
+            &self.network_pkey,
             self.chain.last_random(),
             view_change,
             view_change_proof,
@@ -1501,7 +1508,7 @@ impl NodeService {
         let block_hash = Hash::digest(&block);
 
         // Sign block.
-        block.sign(&self.keys.network_skey, &self.keys.network_pkey);
+        block.sign(&self.network_skey, &self.network_pkey);
 
         info!(
             "Created a micro block: height={}, view_change={}, block={}, transactions={}",

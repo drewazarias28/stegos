@@ -104,7 +104,7 @@ fn smoke_test() {
                 pbc::check_hash(
                     &proposal.request_hash,
                     &request_hash_sig,
-                    &node.node_service.keys.network_pkey,
+                    &node.node_service.network_pkey,
                 )
                 .unwrap();
             } else {
@@ -578,7 +578,7 @@ fn out_of_order_micro_block() {
             leader.node_service.chain.last_random(),
             leader.node_service.chain.view_change(),
         );
-        let random = pbc::make_VRF(&leader.node_service.keys.network_skey, &seed);
+        let random = pbc::make_VRF(&leader.node_service.network_skey, &seed);
 
         let base = BaseBlockHeader::new(
             version,
@@ -588,11 +588,11 @@ fn out_of_order_micro_block() {
             timestamp,
             random,
         );
-        let mut block = MicroBlock::empty(base, None, leader.node_service.keys.network_pkey);
+        let mut block = MicroBlock::empty(base, None, leader.node_service.network_pkey);
 
         let block_hash = Hash::digest(&block);
         let leader_node = s.node(&leader_pk).unwrap();
-        block.sig = pbc::sign_hash(&block_hash, &leader_node.node_service.keys.network_skey);
+        block.sig = pbc::sign_hash(&block_hash, &leader_node.node_service.network_skey);
         let block: Block = Block::MicroBlock(block);
 
         // Discard proposal from leader for a proposal from the leader.

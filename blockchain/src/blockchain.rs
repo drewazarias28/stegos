@@ -1078,27 +1078,24 @@ impl Blockchain {
 pub mod tests {
     use super::*;
 
-    use crate::genesis::genesis;
     use crate::test;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use simple_logger;
     use std::collections::BTreeMap;
     use std::time::{Duration, SystemTime};
-    use stegos_keychain::KeyChain;
     use tempdir::TempDir;
 
     #[test]
     fn basic() {
         simple_logger::init_with_level(log::Level::Debug).unwrap_or_default();
 
-        let keychains = [KeyChain::new_mem()];
         let timestamp = SystemTime::now();
         let cfg: BlockchainConfig = Default::default();
-        let blocks = genesis(
-            &keychains,
+        let (keychains, blocks) = test::fake_genesis(
             cfg.min_stake_amount,
-            cfg.min_stake_amount,
+            10 * cfg.min_stake_amount,
+            3,
             timestamp,
         );
         assert_eq!(blocks.len(), 1);
@@ -1168,14 +1165,14 @@ pub mod tests {
     fn iterate() {
         simple_logger::init_with_level(log::Level::Debug).unwrap_or_default();
 
-        let keychains = [KeyChain::new_mem()];
-        let mut timestamp = SystemTime::now();
         let mut cfg: BlockchainConfig = Default::default();
         cfg.stake_epochs = 1;
-        let genesis = genesis(
-            &keychains,
+        let mut timestamp = SystemTime::now();
+
+        let (keychains, genesis) = test::fake_genesis(
             cfg.min_stake_amount,
             10 * cfg.min_stake_amount,
+            1,
             timestamp,
         );
         let temp_prefix: String = thread_rng().sample_iter(&Alphanumeric).take(30).collect();
@@ -1253,13 +1250,12 @@ pub mod tests {
     fn rollback() {
         simple_logger::init_with_level(log::Level::Debug).unwrap_or_default();
 
-        let keychains = [KeyChain::new_mem()];
         let mut timestamp = SystemTime::now();
         let cfg: BlockchainConfig = Default::default();
-        let genesis = genesis(
-            &keychains,
+        let (keychains, genesis) = test::fake_genesis(
             cfg.min_stake_amount,
             10 * cfg.min_stake_amount,
+            1,
             timestamp,
         );
         let temp_prefix: String = thread_rng().sample_iter(&Alphanumeric).take(30).collect();
@@ -1363,12 +1359,11 @@ pub mod tests {
     #[test]
     fn block_range_limit() {
         simple_logger::init_with_level(log::Level::Debug).unwrap_or_default();
-        let keychains = [KeyChain::new_mem()];
-
         let mut timestamp = SystemTime::now();
         let cfg: BlockchainConfig = Default::default();
         let stake = cfg.min_stake_amount;
-        let blocks = genesis(&keychains, stake, 10 * cfg.min_stake_amount, timestamp);
+        let (keychains, blocks) =
+            test::fake_genesis(stake, 10 * cfg.min_stake_amount, 1, timestamp);
         let mut blockchain =
             Blockchain::testing(cfg, blocks, timestamp).expect("Failed to create blockchain");
         let starting_height = blockchain.height();

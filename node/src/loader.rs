@@ -101,7 +101,7 @@ impl NodeService {
             .validators()
             .into_iter()
             .map(|(k, _)| k)
-            .filter(|key| self.keys.network_pkey != **key);
+            .filter(|key| self.network_pkey != **key);
         let master = validators.choose(&mut rng)?.clone();
         debug!(
             "Selected a source node from the latest committed KeyBlock: hash={:?}, epoch={}, selected={:?}",
