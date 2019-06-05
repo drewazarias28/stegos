@@ -6,7 +6,7 @@
 [![Wiki][wiki-badge]][wiki-url]
 [![Telegram][telegram-badge]][telegram-url]
 
-# Stegos Blockchain
+## Stegos Blockchain
 Stegos is a completely private, confidential, and scalable cryptocurrency that’s friendly to the environment. Stegos builds and improves upon other privacy coins and can be used to send payments and data with complete confidentiality.
 
 Stegos uses the UTXO (coin) model and PoS (Proof-of-Stake) consensus.
@@ -20,40 +20,40 @@ All amounts in Stegos are hidden using cryptographic commitments and zero-knowle
 Check out our [white paper](https://stegos.com//docs/stegos-whitepaper.pdf) for more info.
 
 
-## Project Status
+* **Project Status**
 
-[Project plan](https://github.com/stegos/stegos/wiki/project-plan)
+  * [Project plan](https://github.com/stegos/stegos/wiki/project-plan)
 
-[Latest release](https://github.com/stegos/stegos/releases)
+  * [Latest release](https://github.com/stegos/stegos/releases)
 
-## Installing from Source
+* **Installing from Source**
 
-Please, refer to [Building instructions](BUILD.md).
+  * Please, refer to [Building instructions](BUILD.md).
 
-## How To Contribute
+* **How To Contribute**
 
-We encourage you to contribute in any way you can!
+  * We encourage you to contribute in any way you can!
 
-Please see our [CONTRIBUTING GUIDE](https://github.com/stegos/stegos/blob/dev/CONTRIBUTING.md) and [CODE OF CONDUCT](https://github.com/stegos/stegos/blob/readme/CODE_OF_CONDUCT.md) for more information on contributing.
+  * Please see our [CONTRIBUTING GUIDE](https://github.com/stegos/stegos/blob/dev/CONTRIBUTING.md) and [CODE OF CONDUCT](https://github.com/stegos/stegos/blob/readme/CODE_OF_CONDUCT.md) for more information on contributing.
 
-## Have questions?
-Read the answers to [frequently asked questions](https://github.com/stegos/stegos/wiki/Stegos-Frequently-Asked-Questions). If you did not find the answer, feel free to ask in [Stegos telegram chat](https://t.me/stegos4privacy).
+* **Have questions?**
+  * Read the answers to [frequently asked questions](https://github.com/stegos/stegos/wiki/Stegos-Frequently-Asked-Questions). If you did not find the answer, feel free to ask in [Stegos telegram chat](https://t.me/stegos4privacy).
 
-## Roadmap
-__Q2 2019__
+* **Roadmap**
+  * __Q2 2019__
 Mainnet and native token
 
-__Q3 2019__
+  * __Q3 2019__
 Exchange sale
 
-__Q4 2019__
+  * __Q4 2019__
 Sharding
 Mobile staking
 
-__Q1 2020__
+  * __Q1 2020__
 App Store Private marketplaces Dandelion
 
-__Q2 2020__
+  * __Q2 2020__
 Pruning with no bootstrap nodes zk-STARKsns
 
 
